@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SST MONOPOLY - El Reto de la Empresa Segura</title>
+    <style>
+        :root {
+            --lila: #B39DDB;
+            --lila-dark: #7E57C2;
+            --rosado: #F48FB1;
+            --rosado-dark: #C2185B;
+            --blanco: #FFFFFF;
+            --gris-oscuro: #212121;
+            --bg: #F3E5F5;
+            --amarillo-sst: #FFD54F;
+            --verde-sst: #81C784;
+            --rojo-sst: #E57373;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background-color: var(--bg); color: var(--gris-oscuro); overflow-x: hidden; min-height: 100vh; }
+
+        /* Pantallas */
+        .screen { display: none; min-height: 100vh; padding: 15px; flex-direction: column; align-items: center; justify-content: center; }
+        .screen.active { display: flex; }
+
+        /* Botones y Tipografía */
+        h1 { color: var(--lila-dark); text-align: center; font-size: 2.2rem; text-shadow: 2px 2px 0px var(--rosado); margin-bottom: 10px; }
+        h2, h3 { color: var(--gris-oscuro); text-align: center; }
+        
+        .btn { 
+            background: var(--lila-dark); color: var(--blanco); border: none; padding: 12px 20px; 
+            font-size: 1rem; border-radius: 25px; cursor: pointer; font-weight: bold; 
+            margin: 5px; transition: all 0.2s ease; box-shadow: 0 4px 6px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 8px; justify-content: center;
+        }
+        .btn:hover { background: var(--rosado-dark); transform: translateY(-2px); }
+        .btn-success { background: #4CAF50; }
+        .btn-warning { background: #FF9800; }
+        .btn-danger { background: #F44336; }
+        .btn-small { padding: 8px 14px; font-size: 0.85rem; }
+
+        /* Pantalla Inicio */
+        .start-card { background: var(--blanco); padding: 25px; border-radius: 20px; border: 4px solid var(--lila); max-width: 450px; width: 100%; text-align: center; box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+        .player-setup-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+        .player-setup-row input { flex: 1; padding: 8px 12px; border: 2px solid var(--lila); border-radius: 10px; }
+        .player-setup-row select { padding: 8px; border: 2px solid var(--lila); border-radius: 10px; }
+
+        /* Layout Principal del Juego */
+        .game-layout { display: flex; flex-wrap: wrap; width: 100%; max-width: 1350px; gap: 15px; justify-content: center; align-items: flex-start; margin-top: 10px; }
+        
+        /* Paneles Laterales */
+        .panel { background: var(--blanco); padding: 15px; border-radius: 15px; border: 3px solid var(--lila); box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+        .left-panel { flex: 1; min-width: 290px; max-width: 340px; display: flex; flex-direction: column; gap: 12px; }
+        .right-panel { flex: 1; min-width: 290px; max-width: 340px; display: flex; flex-direction: column; gap: 12px; }
+
+        /* Ficha de Jugador */
+        .player-card { padding: 10px; border-radius: 12px; border-left: 6px solid #ccc; background: #fafafa; position: relative; transition: 0.3s; }
+        .player-card.active-turn { background: #f3e5f5; border-left-color: var(--rosado-dark); box-shadow: 0 0 10px rgba(126,87,194,0.3); }
+        .progress-bar-bg { background: #e0e0e0; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 5px; }
+        .progress-bar-fill { background: var(--lila-dark); height: 100%; width: 0%; transition: width 0.4s ease; }
+
+        /* Controles de Juego */
+        .controls-box { text-align: center; background: #fff8e1; border: 2px dashed var(--amarillo-sst); padding: 12px; border-radius: 12px; }
+        #dice-display { font-size: 2.8rem; margin: 5px 0; }
+
+        /* Tablero GRID 9x9 */
+        .board-container { flex: 2; min-width: 320px; max-width: 640px; aspect-ratio: 1/1; position: relative; }
+        .board { 
+            width: 100%; height: 100%; display: grid; 
+            grid-template-columns: repeat(9, 1fr); grid-template-rows: repeat(9, 1fr); 
+            gap: 2px; background: var(--gris-oscuro); border: 4px solid var(--gris-oscuro); border-radius: 12px; overflow: hidden; 
+        }
+        
+        .cell { background: var(--blanco); display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; font-size: 0.6rem; padding: 2px; position: relative; cursor: pointer; }
+        .cell:hover { filter: brightness(0.95); }
+        .cell-corner { background: var(--lila); color: var(--blanco); font-weight: bold; }
+        .cell-title { font-weight: bold; line-height: 1.1; margin-top: 2px; font-size: 0.62rem; }
+        .cell-icon { font-size: 1.1rem; margin: 1px 0; }
+        .cell-price { color: var(--rosado-dark); font-weight: bold; font-size: 0.58rem; }
+        .cell-owner-bar { height: 4px; width: 100%; position: absolute; top: 0; left: 0; }
+
+        /* Centro del Tablero */
+        .board-center { 
+            grid-column: 2 / 9; grid-row: 2 / 9; 
+            background: linear-gradient(135deg, #ffffff 0%, #f3e5f5 100%); 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            padding: 15px; text-align: center; position: relative; border: 2px solid var(--lila);
+        }
+        .center-graphic { font-size: 3rem; margin: 5px 0; }
+
+        /* Fichas */
+        .tokens-layer { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; }
+        .token-item { font-size: 1.1rem; filter: drop-shadow(1px 1px 1px rgba(0,0,0,0.6)); transition: all 0.3s ease; }
+
+        /* Insignias y Misiones */
+        .badge-grid { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 5px; }
+        .badge-icon { font-size: 1.4rem; opacity: 0.25; transition: 0.3s; }
+        .badge-icon.unlocked { opacity: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); transform: scale(1.1); }
+        .mission-item { font-size: 0.8rem; padding: 6px; border-radius: 8px; background: #f5f5f5; margin-bottom: 5px; border-left: 4px solid #ccc; text-align: left; }
+        .mission-item.completed { border-left-color: var(--verde-sst); background: #e8f5e9; text-decoration: line-through; }
+
+        /* Modales */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 1000; justify-content: center; align-items: center; padding: 15px; }
+        .modal { background: var(--blanco); padding: 20px; border-radius: 20px; max-width: 520px; width: 100%; text-align: center; border: 5px solid var(--rosado); box-shadow: 0 10px 25px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto; }
+        .modal-title { font-size: 1.3rem; color: var(--lila-dark); margin-bottom: 10px; }
+        .modal-body { font-size: 0.95rem; margin-bottom: 15px; white-space: pre-line; text-align: left; line-height: 1.4; }
+        .options-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+        .option-btn { background: #f5f5f5; color: var(--gris-oscuro); font-size: 0.9rem; text-align: left; padding: 10px 14px; border: 2px solid #e0e0e0; border-radius: 12px; cursor: pointer; transition: 0.2s; }
+        .option-btn:hover { background: #e8eaf6; border-color: var(--lila-dark); }
+
+        /* Temporizador */
+        .timer-badge { display: inline-block; background: var(--rojo-sst); color: var(--blanco); padding: 4px 12px; border-radius: 15px; font-weight: bold; font-size: 0.9rem; margin-bottom: 10px; }
+
+        /* Audio Player Bar */
+        .audio-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #ede7f6; padding: 8px 12px; border-radius: 12px; margin-top: 5px; font-size: 0.8rem; }
+
+        @media (max-width: 768px) {
+            .cell-title { font-size: 0.5rem; }
+            .cell-icon { font-size: 0.8rem; }
+            .cell-price { font-size: 0.45rem; }
+            h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="screen-start" class="screen active">
+        <div class="start-card">
+            <h1>🦺 SST MONOPOLY</h1>
+            <p style="color: var(--rosado-dark); font-weight: bold; margin-bottom: 15px;">"EL RETO DE LA EMPRESA SEGURA"</p>
+
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="font-weight: bold; font-size: 0.9rem;">Configurar Jugadores:</label>
+                <div id="players-setup-list" style="margin-top: 8px;"></div>
+                <button class="btn btn-small" onclick="addPlayerSetup()">➕ Añadir Jugador</button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+                <button class="btn btn-success" onclick="startGame()">▶️ INICIAR PARTIDA</button>
+                <button class="btn btn-warning" onclick="loadSavedGame()">💾 CONTINUAR PARTIDA</button>
+                <button class="btn" onclick="showRulesModal()">📖 ¿CÓMO JUGAR?</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-game" class="screen">
+        <div style="display: flex; width: 100%; max-width: 1350px; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <h2>🦺 SST MONOPOLY <span style="font-size: 1rem; color: var(--lila-dark);">| Capacitación SST</span></h2>
+            <div>
+                <button class="btn btn-small" onclick="saveGame()">💾 Guardar</button>
+                <button class="btn btn-small btn-warning" onclick="openTradeModal()">🤝 Negociar</button>
+                <button class="btn btn-small btn-danger" onclick="confirmReset()">🔄 Reiniciar</button>
+            </div>
+        </div>
+
+        <div class="game-layout">
+            <div class="left-panel">
+                <div class="panel">
+                    <h3>👥 Estado de Empresas</h3>
+                    <div id="players-status-container" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;"></div>
+                </div>
+
+                <div class="panel">
+                    <h3>🏆 Ranking SST</h3>
+                    <div id="ranking-container" style="margin-top: 8px; font-size: 0.85rem;"></div>
+                </div>
+            </div>
+
+            <div class="board-container">
+                <div class="board" id="board-grid">
+                    <div class="board-center">
+                        <div class="center-graphic">🦺 🧯 👷</div>
+                        <h3 style="color: var(--lila-dark); font-size: 1.1rem;">SST MONOPOLY</h3>
+                        <p style="font-size: 0.75rem; color: #555;">El Reto de la Empresa Segura</p>
+                        <div style="margin-top: 8px; font-size: 0.7rem; background: #fff; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--lila);">
+                            🎯 <strong>Ley 29783 & IPERC</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="panel controls-box">
+                    <h3 id="current-turn-label" style="color: var(--rosado-dark);">Turno del Jugador</h3>
+                    <div id="dice-display">🎲</div>
+                    <button id="btn-roll" class="btn btn-success" onclick="rollDice()">🎲 LANZAR DADO</button>
+                    <button id="btn-end-turn" class="btn" style="display:none;" onclick="endTurn()">TERMINAR TURNO ➡️</button>
+                </div>
+
+                <div class="panel">
+                    <h3>🎯 Misiones Activas</h3>
+                    <div id="missions-container" style="margin-top: 8px;"></div>
+                </div>
+
+                <div class="panel">
+                    <h3>🏅 Insignias de la Empresa</h3>
+                    <div id="badges-container" class="badge-grid"></div>
+                </div>
+
+                <div class="panel">
+                    <h4 style="font-size: 0.85rem;">🎵 Ambientación Musical</h4>
+                    <div class="audio-bar">
+                        <button class="btn btn-small" id="btn-music" onclick="toggleMusic()">▶️ Música SST</button>
+                        <input type="file" id="audio-file" accept="audio/*" style="display:none;" onchange="loadCustomAudio(event)">
+                        <button class="btn btn-small" onclick="document.getElementById('audio-file').click()">📁 Cargar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="screen-end" class="screen">
+        <div class="start-card" style="max-width: 600px;">
+            <h1>🏆 FIN DE LA PARTIDA</h1>
+            <p style="font-weight: bold; color: var(--lila-dark); font-size: 1.1rem; margin-bottom: 15px;">"LA EMPRESA MÁS SEGURA ES..."</p>
+            <div id="final-podium" style="text-align: left; margin-bottom: 20px;"></div>
+            <h3 style="color: var(--rosado-dark); font-size: 1.1rem; margin-bottom: 15px;">🦺 "LA SEGURIDAD NO ES SUERTE, ES UNA DECISIÓN."</h3>
+            <button class="btn btn-success" onclick="location.reload()">🔄 NUEVA PARTIDA</button>
+        </div>
+    </div>
+
+    <div id="modal-container" class="modal-overlay">
+        <div class="modal">
+            <div id="timer-box" style="display: none;" class="timer-badge">⏱️ <span id="timer-seconds">30</span>s</div>
+            <h2 id="modal-title" class="modal-title">Título del Modal</h2>
+            <div id="modal-body" class="modal-body">Contenido...</div>
+            <div id="modal-options" class="options-list"></div>
+            <button id="modal-close-btn" class="btn btn-small" style="margin-top: 15px; display: none;" onclick="closeModal()">CONTINUAR</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURACIÓN GENERAL Y ESTADOS ---
+        const TOKENS = ['🦺', '🧯', '👷', '🚧'];
+        const COLORS = ['#2196F3', '#F44336', '#4CAF50', '#FF9800'];
+        
+        let players = [];
+        let currentPlayerIndex = 0;
+        let boardSpaces = [];
+        let timerInterval = null;
+
+        // Niveles SST
+        const LEVELS = [
+            { level: 1, name: "TRABAJADOR EN RIESGO", minPts: 0 },
+            { level: 2, name: "EN PREVENCIÓN", minPts: 1200 },
+            { level: 3, name: "TRABAJADOR SEGURO", minPts: 1600 },
+            { level: 4, name: "LÍDER DE SEGURIDAD", minPts: 2000 },
+            { level: 5, name: "EMPRESA EJEMPLAR", minPts: 2500 }
+        ];
+
+        // Insignias SST
+        const BADGES_DEF = [
+            { id: "epp", icon: "🦺", name: "EXPERTO EN EPP", desc: "Responde 3 preguntas de EPP" },
+            { id: "iperc", icon: "📋", name: "MAESTRO DEL IPERC", desc: "Completa retos de IPERC" },
+            { id: "emergencia", icon: "🚑", name: "HÉROE DE EMERGENCIAS", desc: "Resuelve una emergencia" },
+            { id: "cero_acc", icon: "🛡️", name: "CERO ACCIDENTES", desc: "Mantén tus puntos altos" },
+            { id: "inspector", icon: "🔎", name: "INSPECTOR SST", desc: "Adquiere 3 propiedades" },
+            { id: "lider", icon: "⭐", name: "LÍDER PREVENTIVO", desc: "Obtén buenas prácticas" }
+        ];
+
+        // Misiones SST
+        const MISSIONS_DEF = [
+            { id: 1, text: "Identifica el Peligro (Responde 2 Retos SST)", target: 2, current: 0, completed: false, reward: 200 },
+            { id: 2, text: "Protege a tu equipo (Adquiere 2 Áreas)", target: 2, current: 0, completed: false, reward: 250 },
+            { id: 3, text: "Empresa Preparada (Supera una Emergencia)", target: 1, current: 0, completed: false, reward: 300 }
+        ];
+
+        // Layout de 32 casillas
+        const BOARD_LAYOUT = [
+            { id: 0, type: 'corner', name: 'SALIDA 🚩', desc: 'Recibes +200 Puntos SST al pasar por aquí.', icon: '🚩' },
+            { id: 1, type: 'prop', name: '🏭 ÁREA PRODUCCIÓN', price: 150, rent: 25, icon: '🏭' },
+            { id: 2, type: 'card', name: 'RETO SST ❓', icon: '❓' },
+            { id: 3, type: 'prop', name: '🧪 LABORATORIO', price: 180, rent: 30, icon: '🧪' },
+            { id: 4, type: 'tax', name: 'Mantenimiento EPP', price: -80, icon: '🥾' },
+            { id: 5, type: 'prop', name: '⚙️ ÁREA TÉCNICA', price: 220, rent: 35, icon: '⚙️' },
+            { id: 6, type: 'card', name: 'INCUMPLIMIENTO 🚨', icon: '🚨' },
+            { id: 7, type: 'prop', name: '🗂️ ADMINISTRACIÓN', price: 250, rent: 40, icon: '🗂️' },
+            { id: 8, type: 'corner', name: 'INSPECCIÓN SUNAFIL 🔎', desc: 'Fiscalización Preventiva de Trabajo.', icon: '🔎' },
+            { id: 9, type: 'prop', name: '🦺 ALMACÉN EPP', price: 280, rent: 45, icon: '🦺' },
+            { id: 10, type: 'card', name: 'BUENA PRÁCTICA 🟢', icon: '🟢' },
+            { id: 11, type: 'prop', name: '🧯 ZONA EXTINTORES', price: 300, rent: 50, icon: '🧯' },
+            { id: 12, type: 'event', name: '🔥 EMERGENCIAS', icon: '🔥' },
+            { id: 13, type: 'prop', name: '🚨 RESPUESTA RÁPIDA', price: 320, rent: 55, icon: '🚨' },
+            { id: 14, type: 'card', name: 'RETO SST ❓', icon: '❓' },
+            { id: 15, type: 'prop', name: '🏥 PRIMEROS AUXILIOS', price: 350, rent: 60, icon: '🏥' },
+            { id: 16, type: 'corner', name: 'PAUSA ACTIVA 🧘', desc: 'Zona de descanso ergométrica.', icon: '🧘' },
+            { id: 17, type: 'prop', name: '♻️ GESTIÓN AMBIENTAL', price: 380, rent: 65, icon: '♻️' },
+            { id: 18, type: 'card', name: 'INCUMPLIMIENTO 🚨', icon: '🚨' },
+            { id: 19, type: 'prop', name: '📋 SALA IPERC', price: 400, rent: 70, icon: '📋' },
+            { id: 20, type: 'event', name: '🌎 SISMO & EVACUACIÓN', icon: '🌎' },
+            { id: 21, type: 'prop', name: '🎓 CAPACITACIÓN SST', price: 420, rent: 75, icon: '🎓' },
+            { id: 22, type: 'card', name: 'BUENA PRÁCTICA 🟢', icon: '🟢' },
+            { id: 23, type: 'prop', name: '🚧 ZONA DE RIESGO', price: 450, rent: 80, icon: '🚧' },
+            { id: 24, type: 'corner', name: 'ACCIDENTE 🏥', desc: 'Pérdida de turno por investigación.', icon: '🏥' },
+            { id: 25, type: 'prop', name: '👷 COMITÉ SST', price: 480, rent: 85, icon: '👷' },
+            { id: 26, type: 'card', name: 'RETO SST ❓', icon: '❓' },
+            { id: 27, type: 'prop', name: '📢 SIMULACROS', price: 500, rent: 90, icon: '📢' },
+            { id: 28, type: 'event', name: '⚡ RIESGO ELÉCTRICO', icon: '⚡' },
+            { id: 29, type: 'prop', name: '⚠️ SEÑALIZACIÓN', price: 520, rent: 95, icon: '⚠️' },
+            { id: 30, type: 'card', name: 'INCUMPLIMIENTO 🚨', icon: '🚨' },
+            { id: 31, type: 'prop', name: '🏢 GERENCIA SST', price: 600, rent: 110, icon: '🏢' }
+        ];
+
+        // 25+ Incumplimientos
+        const PENALTIES = [
+            { t: "NO UTILIZAR EPP", d: "Realizaste labores operativas sin casco ni calzado de seguridad.\n\nSanción: -100 Puntos SST", p: -100 },
+            { t: "EXTINTOR VENCIDO", d: "Se halló un extintor con manómetro descalibrado en tu área.\n\nSanción: -150 Puntos SST", p: -150 },
+            { t: "FALTA DE SEÑALIZACIÓN", d: "Área de zanja abierta sin cinta de demarcación ni conos.\n\nSanción: -120 Puntos SST", p: -120 },
+            { t: "IPERC NO REVISADO", d: "Matriz IPERC vencida sin actualización anual obligatoria.\n\nSanción: -150 Puntos SST", p: -150 },
+            { t: "BLOQUEO DE VÍA DE EVACUACIÓN", d: "Cajas obstaculizando la salida de emergencia principal.\n\nSanción: -100 Puntos SST", p: -100 },
+            { t: "ACTO INSEGURO EN ALTURA", d: "Trabajo a más de 1.80m sin arnés acoplado a la línea de vida.\n\nSanción: -200 Puntos SST", p: -200 },
+            { t: "ORDEN Y LIMPIEZA DEFICIENTE", d: "Derrame de aceite no limpiado en el pasillo central.\n\nSanción: -80 Puntos SST", p: -80 }
+        ];
+
+        // 20+ Buenas Prácticas
+        const BONUSES = [
+            { t: "AUDITORÍA CONFORMIDAD", d: "Aprobaste la inspección con 100% de cumplimiento legal.\n\nPremio: +150 Puntos SST", p: 150 },
+            { t: "CAPACITACIÓN EXITOSA", d: "Todo tu equipo completó la inducción del Ministerio de Trabajo.\n\nPremio: +120 Puntos SST", p: 120 },
+            { t: "SIMULACRO EJEMPLAR", d: "Evacuación de planta realizada en menos de 3 minutos.\n\nPremio: +200 Puntos SST", p: 200 },
+            { t: "REPORTE PREVENTIVO", d: "Identificaste una fuga de gas a tiempo evitando una explosión.\n\nPremio: +100 Puntos SST", p: 100 },
+            { t: "PAUSA ACTIVA DESTACADA", d: "Lideraste los ejercicios de estiramiento ergonómico del turno.\n\nPremio: +80 Puntos SST", p: 80 }
+        ];
+
+        // 30+ Preguntas Reto SST con Retroalimentación Edu
+        const QUESTIONS = [
+            { 
+                q: "¿Qué significan las siglas IPERC en el sistema de gestión SST?", 
+                o: ["A) Inspección de Personas y Evaluación de Riesgos Comerciales", "B) Identificación de Peligros, Evaluación de Riesgos y Medidas de Control", "C) Indicador de Prevención en Equipos de Riesgo Crítico"], 
+                a: 1, 
+                exp: "¡Correcto! El IPERC es la herramienta fundamental exigida por la Ley 29783 para prevenir accidentes antes de iniciar actividades.",
+                type: "iperc"
+            },
+            { 
+                q: "¿Cuál es la ley marco de Seguridad y Salud en el Trabajo en el Perú?", 
+                o: ["A) Ley 29783", "B) Ley 30222", "C) D.S. 005-2012-TR"], 
+                a: 0, 
+                exp: "¡Correcto! La Ley N° 29783 establece la norma principal para la prevención de riesgos laborales.",
+                type: "epp"
+            },
+            { 
+                q: "A partir de qué altura se considera obligatoriamente 'Trabajo en Altura':", 
+                o: ["A) 1.50 metros", "B) 1.80 metros", "C) 2.10 metros"], 
+                a: 1, 
+                exp: "¡Muy bien! A partir de 1.80 metros de altura sobre el nivel del suelo es obligatorio el uso de arnés y sistema anticaídas.",
+                type: "epp"
+            },
+            { 
+                q: "Para combatir un amago de incendio de origen eléctrico (Clase C), debes usar:", 
+                o: ["A) Agua presurizada", "B) Extintor de CO2 o PQS", "C) Espuma AFFF"], 
+                a: 1, 
+                exp: "¡Correcto! Jamás debe usarse agua en equipos energizados porque transmite electricidad. El CO2 o PQS cortan la reacción sin conducir energía.",
+                type: "emergencia"
+            },
+            { 
+                q: "¿Qué significa la regla PAS en Primeros Auxilios?", 
+                o: ["A) Prevenir, Atender, Sanar", "B) Proteger, Avisar, Socorrer", "C) Para, Aísla, Sigue"], 
+                a: 1, 
+                exp: "¡Excelente! PAS es la secuencia vital: 1° Proteger el área, 2° Avisar a emergencias, 3° Socorrer al herido.",
+                type: "emergencia"
+            }
+        ];
+
+        // --- 2. AUDIO SYNTHESIZER ---
+        let audioCtx = null;
+        let isMusicPlaying = false;
+        let musicTimer = null;
+
+        function initAudio() {
+            if(!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            initAudio();
+            if(!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if(type === 'dice') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            } else if(type === 'bonus') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1);
+                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.35);
+            } else if(type === 'penalty') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(250, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(120, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            }
+        }
+
+        function toggleMusic() {
+            initAudio();
+            if(isMusicPlaying) {
+                clearInterval(musicTimer);
+                isMusicPlaying = false;
+                document.getElementById('btn-music').innerText = "▶️ Música SST";
+            } else {
+                isMusicPlaying = true;
+                document.getElementById('btn-music').innerText = "⏸️ Pausar";
+                const notes = [261.63, 329.63, 392.00, 523.25, 392.00, 329.63];
+                let noteIdx = 0;
+                musicTimer = setInterval(() => {
+                    if(!audioCtx) return;
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(notes[noteIdx], audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+                    osc.connect(gain); gain.connect(audioCtx.destination);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+                    noteIdx = (noteIdx + 1) % notes.length;
+                }, 300);
+            }
+        }
+
+        function loadCustomAudio(e) {
+            const file = e.target.files[0];
+            if(file) {
+                const url = URL.createObjectURL(file);
+                const a = new Audio(url);
+                a.play();
+                alert(`Reproduciendo audio personalizado: ${file.name}`);
+            }
+        }
+
+        // --- 3. CONFIGURACIÓN INICIAL DE JUGADORES ---
+        let playerSetupCount = 2;
+
+        function renderPlayerSetup() {
+            const container = document.getElementById('players-setup-list');
+            container.innerHTML = '';
+            for(let i=0; i<playerSetupCount; i++) {
+                const div = document.createElement('div');
+                div.className = 'player-setup-row';
+                div.innerHTML = `
+                    <span>${TOKENS[i % TOKENS.length]}</span>
+                    <input type="text" id="setup-name-${i}" value="Empresa ${i+1}" placeholder="Nombre Empresa">
+                    <select id="setup-token-${i}">
+                        ${TOKENS.map((t, idx) => `<option value="${t}" ${idx === i ? 'selected':''}>${t}</option>`).join('')}
+                    </select>
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        function addPlayerSetup() {
+            if(playerSetupCount < 4) {
+                playerSetupCount++;
+                renderPlayerSetup();
+            }
+        }
+
+        // --- 4. INICIO Y CONSTRUCCIÓN DEL TABLERO ---
+        function startGame() {
+            players = [];
+            for(let i=0; i<playerSetupCount; i++) {
+                const name = document.getElementById(`setup-name-${i}`).value || `Empresa ${i+1}`;
+                const token = document.getElementById(`setup-token-${i}`).value;
+                players.push({
+                    id: i,
+                    name: name,
+                    token: token,
+                    color: COLORS[i % COLORS.length],
+                    pos: 0,
+                    points: 1000,
+                    props: [],
+                    badges: [],
+                    stats: { questions: 0, emergencies: 0 },
+                    skipTurn: false
+                });
+            }
+
+            document.getElementById('screen-start').classList.remove('active');
+            document.getElementById('screen-game').classList.add('active');
+
+            buildBoardGrid();
+            updateGameUI();
+        }
+
+        function buildBoardGrid() {
+            const grid = document.getElementById('board-grid');
+            // Mantenemos el centro y agregamos las 32 casillas en las posiciones del perímetro
+            const gridPositions = [
+                [9,9], [9,8], [9,7], [9,6], [9,5], [9,4], [9,3], [9,2], [9,1],
+                [8,1], [7,1], [6,1], [5,1], [4,1], [3,1], [2,1],
+                [1,1], [1,2], [1,3], [1,4], [1,5], [1,6], [1,7], [1,8], [1,9],
+                [2,9], [3,9], [4,9], [5,9], [6,9], [7,9], [8,9]
+            ];
+
+            boardSpaces = BOARD_LAYOUT.map((space, i) => {
+                const cell = document.createElement('div');
+                cell.className = `cell ${space.type === 'corner' ? 'cell-corner' : ''}`;
+                cell.style.gridRow = gridPositions[i][0];
+                cell.style.gridColumn = gridPositions[i][1];
+                cell.id = `cell-${i}`;
+
+                let ownerBar = `<div class="cell-owner-bar" id="owner-bar-${i}"></div>`;
+                let html = `${ownerBar}
+                    <div class="cell-title">${space.name}</div>
+                    <div class="cell-icon">${space.icon}</div>`;
+                if(space.price && space.type === 'prop') {
+                    html += `<div class="cell-price">${space.price} pts</div>`;
+                }
+                html += `<div class="tokens-layer" id="tokens-layer-${i}"></div>`;
+                cell.innerHTML = html;
+                grid.appendChild(cell);
+                return { ...space, owner: null };
+            });
+
+            drawTokens();
+        }
+
+        function drawTokens() {
+            for(let i=0; i<32; i++) {
+                const layer = document.getElementById(`tokens-layer-${i}`);
+                if(layer) layer.innerHTML = '';
+            }
+            players.forEach(p => {
+                const tokenDiv = document.createElement('div');
+                tokenDiv.className = 'token-item';
+                tokenDiv.innerText = p.token;
+                const layer = document.getElementById(`tokens-layer-${p.pos}`);
+                if(layer) layer.appendChild(tokenDiv);
+            });
+        }
+
+        // --- 5. LÓGICA DE DADOS Y TURNOS ---
+        function rollDice() {
+            const player = players[currentPlayerIndex];
+
+            if(player.skipTurn) {
+                player.skipTurn = false;
+                showModal("🏥 INVESTIGACIÓN DE ACCIDENTE", `${player.name} se encuentra en descanso médico por investigación de incidente. Pierdes este turno.`, [], () => endTurn());
+                return;
+            }
+
+            playSound('dice');
+            document.getElementById('btn-roll').style.display = 'none';
+
+            const d1 = Math.floor(Math.random() * 6) + 1;
+            const d2 = Math.floor(Math.random() * 6) + 1;
+            const total = d1 + d2;
+
+            document.getElementById('dice-display').innerText = `🎲 ${d1} + ${d2} = ${total}`;
+
+            setTimeout(() => {
+                player.pos += total;
+                if(player.pos >= 32) {
+                    player.pos -= 32;
+                    player.points += 200;
+                    playSound('bonus');
+                    showModal("🚩 VUELTA COMPLETADA", "¡Recibes +200 Puntos SST por mantener el plan anual de seguridad al día!", []);
+                }
+                drawTokens();
+                updateGameUI();
+                processSquare(player, boardSpaces[player.pos]);
+            }, 600);
+        }
+
+        function processSquare(player, square) {
+            if(square.type === 'prop') {
+                if(square.owner === null) {
+                    if(player.points >= square.price) {
+                        showModal(`🏢 ¿Adquirir ${square.name}?`, `Inversión: ${square.price} Puntos SST.\nTarifa por auditoría de terceros: +${square.rent} pts.`, [
+                            { text: `ADQUIRIR POR ${square.price} PTS`, action: () => buyProperty(player, square) },
+                            { text: "PASAR", action: () => showEndTurnBtn() }
+                        ]);
+                    } else {
+                        showModal("🏢 Área Disponible", `${square.name} requiere ${square.price} pts, pero solo dispones de ${player.points} pts.`, [], () => showEndTurnBtn());
+                    }
+                } else if(square.owner !== player.id) {
+                    const owner = players[square.owner];
+                    player.points -= square.rent;
+                    owner.points += square.rent;
+                    playSound('penalty');
+                    showModal("💸 Auditoría de Áreas", `Has ingresado al área gestionada por ${owner.name}.\nPagas ${square.rent} Puntos SST por derechos de uso y control.`, [], () => { updateGameUI(); showEndTurnBtn(); });
+                } else {
+                    showEndTurnBtn();
+                }
+            } else if(square.type === 'card') {
+                triggerCard(player, square.name);
+            } else if(square.type === 'event') {
+                triggerEmergency(player, square.name);
+            } else if(square.type === 'tax') {
+                player.points += square.price;
+                playSound('penalty');
+                showModal("⚠️ Mantenimiento Preventivo", `Abonaste ${Math.abs(square.price)} Puntos SST en insumos y revisiones de EPP.`, [], () => { updateGameUI(); showEndTurnBtn(); });
+            } else if(square.type === 'corner') {
+                if(square.id === 24) {
+                    player.skipTurn = true;
+                    playSound('penalty');
+                    showModal("🚨 ACCIDENTE REGISTRADO", "Ocurrió un evento no deseado por falla de control. Pierdes el próximo turno.", [], () => showEndTurnBtn());
+                } else {
+                    showEndTurnBtn();
+                }
+            }
+        }
+
+        function buyProperty(player, square) {
+            player.points -= square.price;
+            player.props.push(square.name);
+            square.owner = player.id;
+            playSound('bonus');
+
+            document.getElementById(`owner-bar-${square.id}`).style.background = player.color;
+
+            // Misión 2 check
+            const m2 = MISSIONS_DEF.find(m => m.id === 2);
+            if(m2 && !m2.completed) {
+                m2.current = player.props.length;
+                if(m2.current >= m2.target) {
+                    m2.completed = true;
+                    player.points += m2.reward;
+                    alert(`🎉 ¡MISIÓN COMPLETADA! Protege a tu equipo (+${m2.reward} Puntos SST)`);
+                }
+            }
+
+            checkBadges(player);
+            updateGameUI();
+            closeModal();
+            showEndTurnBtn();
+        }
+
+        // --- 6. RETOS, EMERGENCIAS Y TARJETAS ---
+        function triggerCard(player, cardType) {
+            if(cardType.includes('INCUMPLIMIENTO')) {
+                const item = PENALTIES[Math.floor(Math.random() * PENALTIES.length)];
+                player.points += item.p;
+                playSound('penalty');
+                showModal(`🚨 ${item.t}`, item.d, [], () => { updateGameUI(); showEndTurnBtn(); });
+            } else if(cardType.includes('BUENA PRÁCTICA')) {
+                const item = BONUSES[Math.floor(Math.random() * BONUSES.length)];
+                player.points += item.p;
+                playSound('bonus');
+                showModal(`🟢 ${item.t}`, item.d, [], () => { updateGameUI(); showEndTurnBtn(); });
+            } else if(cardType.includes('RETO SST')) {
+                const q = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+                startQuizTimer(30, () => handleQuizAnswer(player, -1, q));
+                
+                const opts = q.o.map((optText, idx) => ({
+                    text: optText,
+                    action: () => handleQuizAnswer(player, idx, q)
+                }));
+                showModal("❓ RETO DE CONOCIMIENTO SST", q.q, opts);
+            }
+        }
+
+        function handleQuizAnswer(player, selectedIdx, questionObj) {
+            stopQuizTimer();
+            if(selectedIdx === questionObj.a) {
+                player.points += 100;
+                player.stats.questions++;
+                playSound('bonus');
+
+                // Misión 1 check
+                const m1 = MISSIONS_DEF.find(m => m.id === 1);
+                if(m1 && !m1.completed) {
+                    m1.current = player.stats.questions;
+                    if(m1.current >= m1.target) {
+                        m1.completed = true;
+                        player.points += m1.reward;
+                        alert(`🎉 ¡MISIÓN COMPLETADA! Identifica el Peligro (+${m1.reward} Puntos SST)`);
+                    }
+                }
+
+                checkBadges(player);
+                showModal("✅ ¡RESPUESTA CORRECTA!", `${questionObj.exp}\n\nRecompensa: +100 Puntos SST`, [], () => { updateGameUI(); showEndTurnBtn(); });
+            } else {
+                player.points -= 50;
+                playSound('penalty');
+                showModal("❌ RESPUESTA INCORRECTA", `${questionObj.exp}\n\nPenalización: -50 Puntos SST`, [], () => { updateGameUI(); showEndTurnBtn(); });
+            }
+        }
+
+        function triggerEmergency(player, title) {
+            player.stats.emergencies++;
+            const m3 = MISSIONS_DEF.find(m => m.id === 3);
+            if(m3 && !m3.completed) {
+                m3.current = player.stats.emergencies;
+                m3.completed = true;
+                player.points += m3.reward;
+            }
+
+            checkBadges(player);
+
+            showModal(`🔥 EVENTO DE EMERGENCIA: ${title}`, `Se ha presentado un incidente en tiempo real.\n¿Cómo responde la brigada de tu empresa?`, [
+                { text: "1️⃣ Activar alarma y proceder con la evacuación guiada", action: () => { player.points += 120; playSound('bonus'); showModal("🎉 EXCELENTE CONTROL", "Se salvaguardó la vida del personal. +120 Puntos SST", [], () => showEndTurnBtn()); } },
+                { text: "2️⃣ Esperar instrucciones de la gerencia sin evacuar", action: () => { player.points -= 100; playSound('penalty'); showModal("⚠️ MALA DECISIÓN", "La demora puso en riesgo al equipo. -100 Puntos SST", [], () => showEndTurnBtn()); } }
+            ]);
+        }
+
+        // --- 7. SISTEMA DE GAMIFICACIÓN (NIVEL, INSIGNIAS, RANKING) ---
+        function getPlayerLevel(points) {
+            let current = LEVELS[0];
+            for(let lvl of LEVELS) {
+                if(points >= lvl.minPts) current = lvl;
+            }
+            return current;
+        }
+
+        function checkBadges(player) {
+            if(player.props.length >= 3 && !player.badges.includes('inspector')) player.badges.push('inspector');
+            if(player.stats.questions >= 2 && !player.badges.includes('epp')) player.badges.push('epp');
+            if(player.stats.emergencies >= 1 && !player.badges.includes('emergencia')) player.badges.push('emergencia');
+            if(player.points >= 1500 && !player.badges.includes('cero_acc')) player.badges.push('cero_acc');
+        }
+
+        function updateGameUI() {
+            // Panel Izquierdo: Jugadores
+            const statusContainer = document.getElementById('players-status-container');
+            statusContainer.innerHTML = '';
+
+            players.forEach((p, idx) => {
+                const lvl = getPlayerLevel(p.points);
+                const nextLvl = LEVELS.find(l => l.level === lvl.level + 1) || lvl;
+                const pct = Math.min(100, Math.max(10, (p.points / (nextLvl.minPts || 3000)) * 100));
+
+                const div = document.createElement('div');
+                div.className = `player-card ${idx === currentPlayerIndex ? 'active-turn' : ''}`;
+                div.style.borderLeftColor = p.color;
+                div.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong>${p.token} ${p.name}</strong>
+                        <span style="font-size:0.8rem; font-weight:bold; color:var(--lila-dark);">${p.points} Pts</span>
+                    </div>
+                    <div style="font-size:0.75rem; color:#666; margin-top:2px;">⭐ ${lvl.name}</div>
+                    <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+                `;
+                statusContainer.appendChild(div);
+            });
+
+            document.getElementById('current-turn-label').innerText = `Turno: ${players[currentPlayerIndex].name}`;
+
+            // Ranking
+            const rankingDiv = document.getElementById('ranking-container');
+            const sorted = [...players].sort((a,b) => b.points - a.points);
+            rankingDiv.innerHTML = sorted.map((p, i) => `
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                    <span>${i===0?'🥇':(i===1?'🥈':'🥉')} ${p.name}</span>
+                    <strong>${p.points} pts</strong>
+                </div>
+            `).join('');
+
+            // Misiones Panel
+            const missionsDiv = document.getElementById('missions-container');
+            missionsDiv.innerHTML = MISSIONS_DEF.map(m => `
+                <div class="mission-item ${m.completed ? 'completed':''}">
+                    🎯 <strong>${m.text}</strong><br>
+                    <span style="font-size:0.7rem;">Progreso: ${m.current}/${m.target} (+${m.reward} pts)</span>
+                </div>
+            `).join('');
+
+            // Insignias Panel
+            const badgesDiv = document.getElementById('badges-container');
+            const curP = players[currentPlayerIndex];
+            badgesDiv.innerHTML = BADGES_DEF.map(b => `
+                <span class="badge-icon ${curP.badges.includes(b.id) ? 'unlocked':''}" title="${b.name}: ${b.desc}">${b.icon}</span>
+            `).join('');
+
+            // Verificar Bancarrota o Fin
+            const bankrupt = players.filter(p => p.points <= 0);
+            if(bankrupt.length > 0 && players.length > 1) {
+                endGame();
+            }
+        }
+
+        function showEndTurnBtn() {
+            document.getElementById('btn-end-turn').style.display = 'inline-block';
+        }
+
+        function endTurn() {
+            document.getElementById('btn-end-turn').style.display = 'none';
+            document.getElementById('btn-roll').style.display = 'inline-block';
+            document.getElementById('dice-display').innerText = '🎲';
+
+            currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            updateGameUI();
+        }
+
+        // --- 8. TEMPORIZADOR Y MODALES ---
+        function startQuizTimer(seconds, onTimeout) {
+            const box = document.getElementById('timer-box');
+            const span = document.getElementById('timer-seconds');
+            box.style.display = 'inline-block';
+            span.innerText = seconds;
+
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                seconds--;
+                span.innerText = seconds;
+                if(seconds <= 0) {
+                    clearInterval(timerInterval);
+                    box.style.display = 'none';
+                    onTimeout();
+                }
+            }, 1000);
+        }
+
+        function stopQuizTimer() {
+            clearInterval(timerInterval);
+            document.getElementById('timer-box').style.display = 'none';
+        }
+
+        function showModal(title, text, options = [], defaultAction = null) {
+            document.getElementById('modal-container').style.display = 'flex';
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerText = text;
+
+            const optsDiv = document.getElementById('modal-options');
+            optsDiv.innerHTML = '';
+
+            const closeBtn = document.getElementById('modal-close-btn');
+
+            if(options.length > 0) {
+                closeBtn.style.display = 'none';
+                options.forEach(opt => {
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn';
+                    btn.innerText = opt.text;
+                    btn.onclick = () => { opt.action(); };
+                    optsDiv.appendChild(btn);
+                });
+            } else {
+                closeBtn.style.display = 'inline-block';
+                closeBtn.onclick = () => { closeModal(); if(defaultAction) defaultAction(); };
+            }
+        }
+
+        function closeModal() {
+            stopQuizTimer();
+            document.getElementById('modal-container').style.display = 'none';
+        }
+
+        // --- 9. NEGOCIACIÓN Y LOCALSTORAGE ---
+        function openTradeModal() {
+            const p = players[currentPlayerIndex];
+            if(p.props.length === 0) {
+                showModal("🤝 NEGOCIACIÓN DE ÁREAS", "Aún no posees áreas registradas para negociar con otras empresas.", []);
+                return;
+            }
+
+            const other = players.find(x => x.id !== p.id);
+            if(!other) return;
+
+            showModal("🤝 OFERTA DE NEGOCIACIÓN", `Empresa actual: ${p.name}\n¿Deseas vender una de tus áreas a ${other.name} por +150 Puntos SST?`, [
+                { 
+                    text: `VENDER ${p.props[0]} POR +150 PTS`, 
+                    action: () => {
+                        const propName = p.props.shift();
+                        other.props.push(propName);
+                        p.points += 150;
+                        other.points -= 150;
+                        playSound('bonus');
+                        closeModal();
+                        updateGameUI();
+                        alert("🤝 ¡Negociación completada exitosamente!");
+                    } 
+                },
+                { text: "CANCELAR", action: () => closeModal() }
+            ]);
+        }
+
+        function saveGame() {
+            const data = { players, currentPlayerIndex, boardSpaces, MISSIONS_DEF };
+            localStorage.setItem('sst_monopoly_save', JSON.stringify(data));
+            alert("💾 ¡Partida guardada correctamente en este navegador!");
+        }
+
+        function loadSavedGame() {
+            const saved = localStorage.getItem('sst_monopoly_save');
+            if(!saved) {
+                alert("⚠️ No hay ninguna partida guardada disponible.");
+                return;
+            }
+            const data = JSON.parse(saved);
+            players = data.players;
+            currentPlayerIndex = data.currentPlayerIndex;
+            boardSpaces = data.boardSpaces;
+
+            document.getElementById('screen-start').classList.remove('active');
+            document.getElementById('screen-game').classList.add('active');
+
+            buildBoardGrid();
+            updateGameUI();
+            alert("💾 Partida reanudada con éxito.");
+        }
+
+        function confirmReset() {
+            if(confirm("¿Estás seguro de reiniciar la partida actual?")) {
+                location.reload();
+            }
+        }
+
+        function showRulesModal() {
+            showModal("📖 INSTRUCCIONES SST MONOPOLY", 
+                "1. OBJETIVO: Convertirte en la Empresa con mejor gestión de Seguridad y Salud en el Trabajo.\n" +
+                "2. DINÁMICA: Lanza los dados, avanza por las casillas, adquiere áreas clave y responde Retos SST (IPERC, Ley 29783, EPP).\n" +
+                "3. PUNTOS SST: Moneda principal. Ganarás puntos respondiendo correctamente y perdiéndolos ante infracciones o accidentes.\n" +
+                "4. GANADOR: La empresa que logre acumular el mayor puntaje y el máximo nivel de prevención.", 
+                []
+            );
+        }
+
+        function endGame() {
+            document.getElementById('screen-game').classList.remove('active');
+            document.getElementById('screen-end').classList.add('active');
+
+            const sorted = [...players].sort((a,b) => b.points - a.points);
+            const podium = document.getElementById('final-podium');
+
+            podium.innerHTML = sorted.map((p, idx) => `
+                <div style="padding: 10px; margin-bottom: 8px; background: #f5f5f5; border-radius: 10px; border-left: 5px solid ${p.color};">
+                    <strong>${idx === 0 ? '🥇 1er Lugar' : (idx === 1 ? '🥈 2do Lugar' : '🥉 3er Lugar')}: ${p.name}</strong><br>
+                    <span>Puntaje Final: <strong>${p.points} Puntos SST</strong> | Nivel: ${getPlayerLevel(p.points).name}</span>
+                </div>
+            `).join('');
+            playSound('bonus');
+        }
+
+        // Inicializar interfaz de setup de jugadores
+        renderPlayerSetup();
+    </script>
+</body>
+</html>
